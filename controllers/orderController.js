@@ -65,46 +65,43 @@ const addOrderItems = async (req, res) => {
 
     const createdOrder = await order.save();
 
-    // 3. Trigger Brevo Automated Order Confirmation Email via Official SDK
+    // 3. Trigger Brevo Automated Order Confirmation Email via v6 BrevoClient SDK
     try {
-      const { TransactionalEmailsApi, SendSmtpEmail } = require('@getbrevo/brevo');
-      const apiInstance = new TransactionalEmailsApi();
-      
-      // Set API key authorization
-      const apiKey = apiInstance.authentications['api-key'];
-      apiKey.apiKey = process.env.BREVO_API_KEY;
+      const { BrevoClient } = require('@getbrevo/brevo');
+      const brevo = new BrevoClient({
+        apiKey: process.env.BREVO_API_KEY
+      });
 
-      const sendSmtpEmail = new SendSmtpEmail();
-
-      sendSmtpEmail.sender = { 
-        name: process.env.SENDER_NAME || 'ShopSphere', 
-        email: process.env.SENDER_EMAIL || 'gayathri.dkp@gmail.com'
-      };
-      sendSmtpEmail.to = [{ 
-        email: req.user.email, 
-        name: req.user.name || 'Customer' 
-      }];
-      sendSmtpEmail.subject = `Order Confirmation #${createdOrder._id.toString().slice(-8).toUpperCase()}`;
-      sendSmtpEmail.htmlContent = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 25px;">
-            <tr>
-              <td style="font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #111;">SHOPSPHERE</td>
-              <td align="right" style="font-size: 14px; color: #6b7280; font-weight: 500;">ORDER #${createdOrder._id.toString().slice(-8).toUpperCase()}</td>
-            </tr>
-          </table>
-          <h2 style="font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your purchase!</h2>
-          <p style="font-size: 14px; color: #4b5563; line-height: 1.5; margin-bottom: 24px;">
-            Hi <strong>${req.user.name || 'Valued Customer'}</strong>, we're getting your order ready to be shipped.
-          </p>
-          <div style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 35px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-            &copy; ${new Date().getFullYear()} ShopSphere. All rights reserved.
+      await brevo.transactionalEmails.sendTransacEmail({
+        sender: { 
+          name: process.env.SENDER_NAME || 'ShopSphere', 
+          email: process.env.SENDER_EMAIL || 'gayathri.dkp@gmail.com'
+        },
+        to: [{ 
+          email: req.user.email, 
+          name: req.user.name || 'Customer' 
+        }],
+        subject: `Order Confirmation #${createdOrder._id.toString().slice(-8).toUpperCase()}`,
+        htmlContent: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 25px;">
+              <tr>
+                <td style="font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #111;">SHOPSPHERE</td>
+                <td align="right" style="font-size: 14px; color: #6b7280; font-weight: 500;">ORDER #${createdOrder._id.toString().slice(-8).toUpperCase()}</td>
+              </tr>
+            </table>
+            <h2 style="font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your purchase!</h2>
+            <p style="font-size: 14px; color: #4b5563; line-height: 1.5; margin-bottom: 24px;">
+              Hi <strong>${req.user.name || 'Valued Customer'}</strong>, we're getting your order ready to be shipped.
+            </p>
+            <div style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 35px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+              &copy; ${new Date().getFullYear()} ShopSphere. All rights reserved.
+            </div>
           </div>
-        </div>
-      `;
+        `
+      });
 
-      await apiInstance.sendTransacEmail(sendSmtpEmail);
-      console.log('Brevo order confirmation email sent successfully via SDK.');
+      console.log('Brevo order confirmation email sent successfully via SDK v6.');
     } catch (emailErr) {
       console.error('Failed to send Brevo confirmation email:', emailErr.message || emailErr);
     }

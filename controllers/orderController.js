@@ -65,16 +65,16 @@ const addOrderItems = async (req, res) => {
 
     const createdOrder = await order.save();
 
-   // 3. Trigger Brevo Automated Order Confirmation Email via Official SDK
+    // 3. Trigger Brevo Automated Order Confirmation Email via Official SDK
     try {
-      const SibApiV3Sdk = require('@getbrevo/brevo');
-      const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+      const { TransactionalEmailsApi, SendSmtpEmail } = require('@getbrevo/brevo');
+      const apiInstance = new TransactionalEmailsApi();
       
       // Set API key authorization
       const apiKey = apiInstance.authentications['api-key'];
-      apiKey.apiKey = process.env.BREVO_API_KEY ;
+      apiKey.apiKey = process.env.BREVO_API_KEY;
 
-      const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+      const sendSmtpEmail = new SendSmtpEmail();
 
       sendSmtpEmail.sender = { 
         name: process.env.SENDER_NAME || 'ShopSphere', 
@@ -108,6 +108,7 @@ const addOrderItems = async (req, res) => {
     } catch (emailErr) {
       console.error('Failed to send Brevo confirmation email:', emailErr.message || emailErr);
     }
+
     res.status(201).json(createdOrder);
   } catch (error) {
     console.error('Order creation error:', error);

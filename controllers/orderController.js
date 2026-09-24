@@ -65,113 +65,49 @@ const addOrderItems = async (req, res) => {
 
     const createdOrder = await order.save();
 
-    // 3. Trigger Brevo Automated Order Confirmation Email via Native Fetch
+   // 3. Trigger Brevo Automated Order Confirmation Email via Official SDK
     try {
-      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'api-key': 'xkeysib-a5980e2d5507ec615d66ef92a4e7a73911108a4cbb56bb2625900070a4b074-YQ45bgYHIorLEPkq',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          sender: { 
-            name: process.env.SENDER_NAME || 'ShopSphere', 
-            email: process.env.SENDER_EMAIL 
-          },
-          to: [{ 
-            email: req.user.email, 
-            name: req.user.name || 'Customer' 
-          }],
-          subject: `Order Confirmation #${createdOrder._id.toString().slice(-8).toUpperCase()}`,
-          htmlContent: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
-              <!-- Header / Brand & Order ID -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 25px;">
-                <tr>
-                  <td style="font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #111;">
-                    SHOPSPHERE
-                  </td>
-                  <td align="right" style="font-size: 14px; color: #6b7280; font-weight: 500;">
-                    ORDER #${createdOrder._id.toString().slice(-8).toUpperCase()}
-                  </td>
-                </tr>
-              </table>
+      const SibApiV3Sdk = require('@getbrevo/brevo');
+      const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+      
+      // Set API key authorization
+      const apiKey = apiInstance.authentications['api-key'];
+      apiKey.apiKey = process.env.BREVO_API_KEY || 'xkeysib-a5980e2d5507ec615d66ef92a4e7a73911108a4cbb56bb2625900070a4b074-YQ45bgYHIorLEPkq';
 
-              <!-- Greeting & Status -->
-              <h2 style="font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your purchase!</h2>
-              <p style="font-size: 14px; color: #4b5563; line-height: 1.5; margin-bottom: 24px;">
-                Hi <strong>${req.user.name || 'Valued Customer'}</strong>, we're getting your order ready to be shipped. We will notify you when it has been sent.
-              </p>
+      const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
 
-              <!-- Action Button -->
-              <div style="margin-bottom: 30px;">
-                <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  View your order
-                </a>
-              </div>
+      sendSmtpEmail.sender = { 
+        name: process.env.SENDER_NAME || 'ShopSphere', 
+        email: process.env.SENDER_EMAIL || 'kezz2041@gmail.com'
+      };
+      sendSmtpEmail.to = [{ 
+        email: req.user.email, 
+        name: req.user.name || 'Customer' 
+      }];
+      sendSmtpEmail.subject = `Order Confirmation #${createdOrder._id.toString().slice(-8).toUpperCase()}`;
+      sendSmtpEmail.htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 25px;">
+            <tr>
+              <td style="font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #111;">SHOPSPHERE</td>
+              <td align="right" style="font-size: 14px; color: #6b7280; font-weight: 500;">ORDER #${createdOrder._id.toString().slice(-8).toUpperCase()}</td>
+            </tr>
+          </table>
+          <h2 style="font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your purchase!</h2>
+          <p style="font-size: 14px; color: #4b5563; line-height: 1.5; margin-bottom: 24px;">
+            Hi <strong>${req.user.name || 'Valued Customer'}</strong>, we're getting your order ready to be shipped.
+          </p>
+          <div style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 35px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+            &copy; ${new Date().getFullYear()} ShopSphere. All rights reserved.
+          </div>
+        </div>
+      `;
 
-              <!-- Order Summary Heading -->
-              <h3 style="font-size: 16px; font-weight: 600; color: #111; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px;">
-                Order summary
-              </h3>
-
-              <!-- Order Items List -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
-                ${formattedOrderItems.map(item => `
-                  <tr>
-                    <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">
-                      <strong>${item.title || 'Product Item'}</strong> &times; ${item.quantity}                     </td>                     <td align="right" style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151; font-weight: 500;">                       $${(item.price * item.quantity).toFixed(2)}
-                    </td>
-                  </tr>
-                `).join('')}
-              </table>
-
-              <!-- Cost Breakdown -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #4b5563; margin-bottom: 20px;">
-                <tr>
-                  <td style="padding: 6px 0;">Subtotal</td>
-                  <td align="right" style="padding: 6px 0; color: #111; font-weight: 500;">$${calculatedTotal.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0;">Shipping</td>
-                  <td align="right" style="padding: 6px 0; color: #111; font-weight: 500;">$0.00</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">Taxes</td>
-                  <td align="right" style="padding: 6px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; color: #111; font-weight: 500;">$0.00</td>
-                </tr>
-                <tr>
-                  <td style="padding-top: 14px; font-size: 16px; font-weight: 600; color: #111;">Total</td>
-                  <td align="right" style="padding-top: 14px; font-size: 18px; font-weight: 700; color: #111;">$${calculatedTotal.toFixed(2)}</td>
-                </tr>
-              </table>
-
-              <!-- Shipping Address Box -->
-              <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; font-size: 13px; color: #4b5563; margin-top: 25px;">
-                <p style="margin: 0 0 5px 0; font-weight: 600; color: #111;">Shipping Address:</p>
-                <p style="margin: 0;">${formattedShippingAddress.address}, ${formattedShippingAddress.city} - ${formattedShippingAddress.postalCode}, ${formattedShippingAddress.country}</p>
-              </div>
-
-              <!-- Footer -->
-              <div style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 35px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-                &copy; ${new Date().getFullYear()} ShopSphere. All rights reserved.
-              </div>
-            </div>
-          `
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to send email via Brevo API');
-      }
-
-      console.log('Brevo order confirmation email sent successfully.');
+      await apiInstance.sendTransacEmail(sendSmtpEmail);
+      console.log('Brevo order confirmation email sent successfully via SDK.');
     } catch (emailErr) {
-      console.error('Failed to send Brevo confirmation email:', emailErr.message);
+      console.error('Failed to send Brevo confirmation email:', emailErr.message || emailErr);
     }
-
     res.status(201).json(createdOrder);
   } catch (error) {
     console.error('Order creation error:', error);

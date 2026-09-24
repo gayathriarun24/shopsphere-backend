@@ -72,13 +72,13 @@ const addOrderItems = async (req, res) => {
       
       // Set API key authorization
       const apiKey = apiInstance.authentications['api-key'];
-      apiKey.apiKey = process.env.BREVO_API_KEY || 'xkeysib-a5980e2d5507ec615d66ef92a4e7a73911108a4cbb56bb2625900070a4b074-YQ45bgYHIorLEPkq';
+      apiKey.apiKey = process.env.BREVO_API_KEY ;
 
       const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
 
       sendSmtpEmail.sender = { 
         name: process.env.SENDER_NAME || 'ShopSphere', 
-        email: process.env.SENDER_EMAIL || 'kezz2041@gmail.com'
+        email: process.env.SENDER_EMAIL || 'gayathri.dkp@gmail.com'
       };
       sendSmtpEmail.to = [{ 
         email: req.user.email, 

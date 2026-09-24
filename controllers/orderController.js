@@ -6,32 +6,45 @@ const Product = require('../models/Product');
 // @access  Private/Customer
 const addOrderItems = async (req, res) => {
   try {
-    const { orderItems, shippingAddress, totalPrice, paymentMethod } = req.body;
+    const { orderItems, shippingAddress, totalAmount } = req.body;
 
     if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({ message: 'No order items provided' });
     }
 
-    // 1. Fetch product details from DB to guarantee we get the correct title and vendor
+    // 1. Verify stock availability and collect formatted items with guaranteed product titles
     const formattedOrderItems = await Promise.all(
       orderItems.map(async (item) => {
-        const productId = item.product;
+        // Extract product ID safely whether it's sent as a string or nested object
+        const productId = 
+          typeof item.product === 'object' && item.product !== null 
+            ? (item.product._id || item.product.id) 
+            : (item.product || item._id || item.productId);
+
+        if (!productId) {
+          throw new Error('Invalid product reference in order items');
+        }
+
         const productDoc = await Product.findById(productId);
 
         if (!productDoc) {
           throw new Error(`Product not found: ${productId}`);
         }
 
+        // Force resolution of the actual product title from the database document
+        const productTitle = productDoc.title || productDoc.name || item.title || item.name || 'Product Item';
+        const productPrice = item.price !== undefined ? item.price : productDoc.price;
+
         if (productDoc.stock < item.quantity) {
-          throw new Error(`Insufficient stock for "${productDoc.title}". Only ${productDoc.stock} left.`);
+          throw new Error(`Insufficient stock for "${productTitle}". Only ${productDoc.stock} left in stock.`);
         }
 
         return {
           product: productId,
           quantity: item.quantity,
-          price: item.price !== undefined ? item.price : productDoc.price,
-          vendor: productDoc.vendor,
-          title: productDoc.title, // ✅ Explicitly mapping title so it's never undefined
+          price: productPrice,
+          vendor: productDoc.vendor || item.vendor || req.user._id,
+          title: productTitle, // ✅ Explicitly included so Mongoose saves it and the email renders it correctly
           itemStatus: 'Pending'
         };
       })
@@ -44,22 +57,27 @@ const addOrderItems = async (req, res) => {
       });
     }
 
-    const calculatedTotal = totalPrice || formattedOrderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const formattedShippingAddress = {
+      address: shippingAddress?.address || shippingAddress || 'Default Address',
+      city: shippingAddress?.city || 'Chennai',
+      postalCode: shippingAddress?.postalCode || '600001',
+      country: shippingAddress?.country || 'India'
+    };
+
+    const calculatedTotal = totalAmount || formattedOrderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
     const order = new Order({
       customer: req.user._id,
       orderItems: formattedOrderItems,
-      shippingAddress: typeof shippingAddress === 'string' 
-        ? { address: shippingAddress, city: 'Chennai', postalCode: '600001', country: 'India' }
-        : shippingAddress,
+      shippingAddress: formattedShippingAddress,
       totalAmount: calculatedTotal,
-      paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Paid',
+      paymentStatus: 'Paid',
       orderStatus: 'Pending'
     });
 
     const createdOrder = await order.save();
 
-    // 3. Send Brevo Order Confirmation Email
+    // 3. Trigger Brevo Automated Order Confirmation Email via v6 BrevoClient SDK
     try {
       const { BrevoClient } = require('@getbrevo/brevo');
       const brevo = new BrevoClient({
@@ -102,11 +120,12 @@ const addOrderItems = async (req, res) => {
 
             <h2 style="font-size: 22px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your order!</h2>
             <p style="font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 24px;">
-              Hi ${req.user.name || 'there'}, we're getting your order ready to be shipped. We will notify you when it has been sent.
+              We're getting your order ready to be shipped. We will notify you when it has been sent.
             </p>
 
             <div style="margin-bottom: 35px;">
-              <a href="${frontendUrl}/orders" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 600; display: inline-block;">View your order</a>
+              <a href="${frontendUrl}/my-orders" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 600; display: inline-block; margin-right: 15px;">View your order</a>
+              <span style="font-size: 14px; color: #666;">or <a href="${frontendUrl}" style="color: #0284c7; text-decoration: none;">Visit our store</a></span>
             </div>
 
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;" />
@@ -144,9 +163,9 @@ const addOrderItems = async (req, res) => {
         `
       });
 
-      console.log('Order confirmation email sent successfully.');
+      console.log('Brevo order confirmation email sent successfully via SDK v6.');
     } catch (emailErr) {
-      console.error('Failed to send confirmation email:', emailErr.message || emailErr);
+      console.error('Failed to send Brevo confirmation email:', emailErr.message || emailErr);
     }
 
     res.status(201).json(createdOrder);
@@ -155,6 +174,7 @@ const addOrderItems = async (req, res) => {
     res.status(400).json({ message: error.message || 'Server error' });
   }
 };
+
 // @desc    Get logged-in customer's orders
 // @route   GET /api/orders/myorders
 // @access  Private/Customer

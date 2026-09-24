@@ -83,20 +83,72 @@ const addOrderItems = async (req, res) => {
         }],
         subject: `Order Confirmation #${createdOrder._id.toString().slice(-8).toUpperCase()}`,
         htmlContent: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 25px;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+            
+            <!-- Header -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px;">
               <tr>
-                <td style="font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #111;">SHOPSPHERE</td>
+                <td style="font-size: 24px; font-weight: 700; letter-spacing: 0.5px; color: #111;">SHOPSPHERE</td>
                 <td align="right" style="font-size: 14px; color: #6b7280; font-weight: 500;">ORDER #${createdOrder._id.toString().slice(-8).toUpperCase()}</td>
               </tr>
             </table>
-            <h2 style="font-size: 20px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your purchase!</h2>
-            <p style="font-size: 14px; color: #4b5563; line-height: 1.5; margin-bottom: 24px;">
-              Hi <strong>${req.user.name || 'Valued Customer'}</strong>, we're getting your order ready to be shipped.
+
+            <!-- Thank You Section -->
+            <h2 style="font-size: 22px; font-weight: 600; color: #111; margin-bottom: 8px;">Thank you for your order!</h2>
+            <p style="font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 24px;">
+              We're getting your order ready to be shipped. We will notify you when it has been sent.
             </p>
-            <div style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 35px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+
+            <!-- Action Buttons -->
+            <div style="margin-bottom: 35px;">
+              <a href="${process.env.FRONTEND_URL || 'https://shopsphere.onrender.com'}/my-orders" style="background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 600; display: inline-block; margin-right: 15px;">View your order</a>
+              <span style="font-size: 14px; color: #666;">or <a href="${process.env.FRONTEND_URL || 'https://shopsphere.onrender.com'}" style="color: #0284c7; text-decoration: none;">Visit our store</a></span>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;" />
+
+            <!-- Order Summary Title -->
+            <h3 style="font-size: 16px; font-weight: 600; color: #111; margin-bottom: 20px;">Order summary</h3>
+
+            <!-- Items List -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+              ${createdOrder.orderItems.map(item => `
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #333;">
+                    <strong>${item.title || 'Product Item'}</strong> &times; ${item.quantity}
+                  </td>
+                  <td align="right" style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #333; font-weight: 500;">
+                    Rs. ${(item.price * item.quantity).toFixed(2)}
+                  </td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <!-- Totals Breakdown Table -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #555; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 6px 0;" align="right">Subtotal</td>
+                <td style="padding: 6px 0; width: 120px;" align="right">Rs. ${createdOrder.totalAmount.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0;" align="right">Shipping</td>
+                <td style="padding: 6px 0;" align="right">Rs. 0.00</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;" align="right">Taxes</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;" align="right">Rs. 0.00</td>
+              </tr>
+              <tr>
+                <td style="padding: 15px 0; font-size: 16px; font-weight: 600; color: #111;" align="right">Total</td>
+                <td style="padding: 15px 0; font-size: 18px; font-weight: 700; color: #111;" align="right">Rs. ${createdOrder.totalAmount.toFixed(2)}</td>
+              </tr>
+            </table>
+
+            <!-- Footer -->
+            <div style="text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 40px;">
               &copy; ${new Date().getFullYear()} ShopSphere. All rights reserved.
             </div>
+
           </div>
         `
       });

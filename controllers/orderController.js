@@ -22,6 +22,8 @@ const addOrderItems = async (req, res) => {
           throw new Error(`Product not found: ${productId}`);
         }
 
+        const productTitle = productDoc.title || productDoc.name || item.title || 'Product Item';
+        
         // Check if sufficient stock is available
         if (productDoc.stock < item.quantity) {
           throw new Error(`Insufficient stock for "${productDoc.title}". Only ${productDoc.stock} left in stock.`);
@@ -32,7 +34,7 @@ const addOrderItems = async (req, res) => {
           quantity: item.quantity,
           price: item.price,
           vendor: productDoc.vendor || item.vendor || item.user || req.user._id,
-          title: productDoc.title // Attached for clean email rendering
+          title: productTitle // Attached for clean email rendering
         };
       })
     );
